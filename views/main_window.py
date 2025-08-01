@@ -1,12 +1,42 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from models.jemaat_model import get_all_jemaat, add_jemaat, update_jemaat, delete_jemaat
 from tkcalendar import DateEntry
+from models.jemaat_model import get_all_jemaat, add_jemaat, update_jemaat, delete_jemaat
+from utils.backup import backup_manual, backup_otomatis
+from utils.xlsx_exporter import export_to_excel
+from utils.backup import backup_manual, backup_otomatis, import_database
 
 def show_main_window(root):
     root.title("Every Nation Church Database")
-    root.geometry("1000x500")
+    root.geometry("1000x550")
 
+    # --- SEARCH BAR ---
+    search_var = tk.StringVar()
+
+    def refresh_table(filtered_data=None):
+        for row in tree.get_children():
+            tree.delete(row)
+        jemaat_list = filtered_data if filtered_data else get_all_jemaat()
+        for idx, row in enumerate(jemaat_list, start=1):
+            tree.insert("", tk.END, values=(idx, *row[1:]))
+
+    def on_search(*args):
+        keyword = search_var.get().lower()
+        jemaat_list = get_all_jemaat()
+        filtered = [
+            r for r in jemaat_list
+            if keyword in " ".join(str(x).lower() for x in r[1:])
+        ]
+        refresh_table(filtered)
+
+    search_var.trace_add("write", on_search)
+
+    frame_search = tk.Frame(root)
+    frame_search.pack(pady=(10, 0))
+    tk.Label(frame_search, text="Cari: ").pack(side=tk.LEFT)
+    tk.Entry(frame_search, textvariable=search_var, width=50).pack(side=tk.LEFT, padx=5)
+
+    # --- TABEL JEMAAT ---
     columns = (
         "No", "Nama Lengkap", "Alamat", "No. HP", "Tanggal Lahir", "Jenis Kelamin",
         "Status", "Pemuridan", "Baptis", "Pelayanan"
@@ -16,14 +46,7 @@ def show_main_window(root):
         tree.heading(col, text=col)
         tree.column(col, width=100)
 
-    tree.pack(fill=tk.BOTH, expand=True)
-
-    def refresh_table():
-        for row in tree.get_children():
-            tree.delete(row)
-        jemaat_list = get_all_jemaat()
-        for idx, row in enumerate(jemaat_list, start=1):
-            tree.insert("", tk.END, values=(idx, *row[1:]))
+    tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
     refresh_table()
 
@@ -102,3 +125,12 @@ def show_main_window(root):
     tk.Button(frame_btn, text="Tambah Jemaat", command=lambda: open_form()).pack(side=tk.LEFT, padx=10)
     tk.Button(frame_btn, text="Edit", command=edit_selected).pack(side=tk.LEFT, padx=10)
     tk.Button(frame_btn, text="Hapus", command=delete_selected).pack(side=tk.LEFT, padx=10)
+    tk.Button(frame_btn, text="Backup Manual", command=backup_manual).pack(side=tk.LEFT, padx=10)
+    tk.Button(frame_btn, text="Export ke Excel", command=export_to_excel).pack(side=tk.LEFT, padx=10)
+    tk.Button(frame_btn, text="Import Database", command=lambda: [import_database(), refresh_table()]).pack(side=tk.LEFT, padx=10)
+
+    def on_exit():
+        backup_otomatis()
+        root.destroy()
+
+    root.protocol("WM_DELETE_WINDOW", on_exit)
